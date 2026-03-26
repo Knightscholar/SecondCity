@@ -1,5 +1,3 @@
-#define TRAIT_PRESENCE_IMMUNE "presence_immune"
-
 /datum/discipline/presence
 	name = "Presence"
 	desc = "Allows you to attract, sway, and control crowds through supernatural allure and emotional manipulation."
@@ -23,21 +21,10 @@
 	if(!ishuman(target))
 		return FALSE
 
-	if(HAS_TRAIT(target, TRAIT_PRESENCE_IMMUNE))
-		to_chat(owner, span_warning("A presence attempt has botched against this person and they may no longer have Presence used on them for the rest of the night."))
-		return FALSE
-
 	//is the difficulty pre-defined? if not, its probably their willpower.
 	var/theirpower = difficulty || target.st_get_stat(STAT_TEMPORARY_WILLPOWER)
 
 	var/successes = SSroll.storyteller_roll(owner_stat, difficulty = theirpower, roller = owner, numerical = TRUE)
-
-	//botch
-	if(successes < 0)
-		ADD_TRAIT(target, TRAIT_PRESENCE_IMMUNE, TRAIT_GENERIC)
-		to_chat(owner, span_warning("A presence attempt has botched against this person and they may no longer have Presence used on them for the rest of the night."))
-		return FALSE
-
 	//number of successes is rather critical for the efficacy of the power
 	return successes
 
@@ -115,7 +102,7 @@
 	for(var/i = 1; i <= min(targets_to_affect, length(potential_targets)); i++)
 		var/mob/living/carbon/target = potential_targets[i]
 		apply_presence_overlay(target)
-		to_chat(target, span_yellowteamradio("You feel extremely attracted to and persuaded by [owner]'s words, no matter what they're saying!"))
+		to_chat(target, span_yellowteamradio("[owner]'s words and bearing seem to have more weight, no matter what they are; whatever merit they have seems magnified."))
 		target.apply_status_effect(STATUS_EFFECT_AWE)
 		affected_targets += target
 
@@ -190,12 +177,18 @@
 	duration_length = 5 SECONDS
 	vitae_cost = 1
 	var/successes = 0
+	var/list/botched_entrancement = list()
 
 /datum/discipline_power/presence/entrancement/pre_activation_checks(mob/living/target)
-
+	if (target in botched_entrancement)
+		to_chat(owner, span_warning("Your previous failed attempt has made [target] resistant to your Entrancement for the rest of the night."))
+		return FALSE
 	successes = presence_check(owner, target, owner.st_get_stat(STAT_APPEARANCE) + owner.st_get_stat(STAT_EMPATHY))
 	if(successes > 0)
 		return TRUE
+	else
+		botched_entrancement += target
+		to_chat(owner, span_warning("Your Entrancement attempt has failed. [target] is now resistant to your Entrancement for the rest of the night."))
 
 	do_cooldown(cooldown_length)
 	return FALSE
@@ -209,8 +202,8 @@
 	log_combat(owner, target, "Used Presence Entrancement")
 
 	apply_presence_overlay(target, successes * 1 MINUTES)
-	to_chat(target, span_hypnophrase("You find yourself becoming completely entraced by [owner]. You are now their willing servant."))
-	to_chat(target, span_info("You are now the willing servant of [owner]. You will seek to please them and fulfill their every desire, but this desire will fade soon."))
+	to_chat(target, span_hypnophrase("You find yourself becoming completely entranced by [owner]. They are closely dear to you."))
+	to_chat(target, span_info("[owner] is earnestly dear to you, suddenly, and their needs and desires are something to be fulfilled. Though you remain fully yourself, you would take significant risks to your wellbeing to do so."))
 	addtimer(CALLBACK(src, PROC_REF(end_entrancement), target), successes * 10 MINUTES)
 
 /datum/discipline_power/presence/entrancement/proc/end_entrancement(mob/living/carbon/human/target)
@@ -234,6 +227,7 @@
 	vitae_cost = 1
 	var/successes = 0
 	var/mob/living/carbon/human/summon_target
+	var/list/botched_summon = list()
 
 /datum/discipline_power/presence/summon/pre_activation_checks(mob/living/target)
 	var/summon_target_name = tgui_input_text(owner, "Summon Target:", "Summon Target")
@@ -249,12 +243,18 @@
 	if(!summon_target)
 		to_chat(owner, span_warning("You cannot sense anyone by that name."))
 		return FALSE
-
+	if (target in botched_summon)
+		to_chat(owner, span_warning("Your previous failed attempt has made [target] resistant to your Summon for the rest of the night."))
+		return FALSE
 	//this ability has a difficulty of 4 or 5 or something for people the summoner has met, and 8 for those they've only met briefly.
 	//i thought that was too low and the ability for the misuse of this disc caused me to raise it to 7 difficulty
 	successes = presence_check(owner, summon_target, owner.st_get_stat(STAT_CHARISMA) + owner.st_get_stat(STAT_SUBTERFUGE), 7)
 	if(successes > 0)
 		return TRUE
+	else
+		botched_summon += target
+		to_chat(owner, span_warning("Your Summon attempt has failed. [target] is now resistant to your Summon for the rest of the night."))
+
 
 	do_cooldown(cooldown_length)
 	return FALSE
